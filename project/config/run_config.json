@@ -1,0 +1,9 @@
+{
+  "K": 10,
+  "M": 1000000,
+  "Rf": 0.04,
+  "R_min": 0.12,
+  "seed": 42,
+  "block_size": 256,
+  "cloud_sample_size": 2000
+}
