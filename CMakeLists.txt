@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.18)
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75 CACHE STRING "CUDA architectures")
+endif()
+project(HPC_Portfolio LANGUAGES CXX CUDA)
+include(CTest)
+add_subdirectory(project)
