@@ -1,0 +1,50 @@
+# C / C++ Executables & Object files
+*.exe
+*.obj
+*.o
+*.so
+*.dylib
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.idb
+
+# Build directories
+build/
+bin/
+out/
+x64/
+x86/
+Debug/
+Release/
+
+# Visual Studio / Visual Studio Code
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# CMake build outputs
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.env
+.venv/
+env/
+venv/
+project/results/python/
+
+# System / OS
+.DS_Store
+Thumbs.db

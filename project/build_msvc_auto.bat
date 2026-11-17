@@ -1,32 +1,35 @@
 @echo off
-REM build_msvc_auto.bat - Build MSVC tu PowerShell/CMD thuong (tu tim vcvars64)
-REM KHONG can mo "Developer Command Prompt" thu cong.
+REM build_msvc_auto.bat - Build MSVC tu dong bang vswhere
+REM Ho tro moi phien ban VS (2017, 2019, 2022, 2026, Build Tools, custom path)
 
 set SRC=%~dp0src\cpu\cpu_mc.cpp
 set OUT=%~dp0cpu_mc.exe
 set ROOT=%~dp0
-REM Xoa dau \ cuoi (tranh double-slash khi truyen vao exe)
 if "%ROOT:~-1%"=="\" set ROOT=%ROOT:~0,-1%
 
-REM Tim vcvars64.bat tu cac phien ban VS pho bien
-set VCVARS=
-for %%V in (18 17 16 15) do (
-    if exist "C:\Program Files\Microsoft Visual Studio\%%V\Community\VC\Auxiliary\Build\vcvars64.bat" (
-        set VCVARS=C:\Program Files\Microsoft Visual Studio\%%V\Community\VC\Auxiliary\Build\vcvars64.bat
-        goto :found
-    )
-    if exist "C:\Program Files\Microsoft Visual Studio\%%V\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
-        set VCVARS=C:\Program Files\Microsoft Visual Studio\%%V\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-        goto :found
-    )
-    if exist "C:\Program Files\Microsoft Visual Studio\%%V\Professional\VC\Auxiliary\Build\vcvars64.bat" (
-        set VCVARS=C:\Program Files\Microsoft Visual Studio\%%V\Professional\VC\Auxiliary\Build\vcvars64.bat
-        goto :found
-    )
+REM Tim vswhere.exe
+set VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe
+if not exist "%VSWHERE%" set VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe
+
+if not exist "%VSWHERE%" (
+    echo [ERROR] Khong tim thay vswhere.exe
+    echo Vui long cai dat Visual Studio hoac Build Tools tu:
+    echo https://visualstudio.microsoft.com/downloads/
+    exit /b 1
 )
 
+REM Dung vswhere de tim installation co bo cong cu C++ (x64) va lay duong dan vcvars64.bat
+set VCVARS=
+for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualCpp.Tools.HostX64.TargetX64 -find VC\Auxiliary\Build\vcvars64.bat`) do (
+    set "VCVARS=%%i"
+)
+
+if "%VCVARS%"=="" goto :notfound
+goto :found
+
 :notfound
-echo [ERROR] Khong tim thay Visual Studio. Cai VS 2019/2022/2026 voi C++ workload.
+echo [ERROR] Khong tim thay bo cong cu C++ (Desktop development with C++).
+echo Vui long mo Visual Studio Installer, chon Modify va cai dat Desktop development with C++.
 exit /b 1
 
 :found
@@ -40,6 +43,8 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 echo [OK] Build successful: %OUT%
+
+if exist "%~dp0cpu_mc.obj" del "%~dp0cpu_mc.obj" >nul 2>&1
 
 echo.
 echo [RUN] Running Monte Carlo simulation ...

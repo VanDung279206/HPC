@@ -2,7 +2,7 @@
  * cpu_mc.cpp
  * Monte Carlo Portfolio Optimization - CPU Implementation
  *
- * Task A04: Static Arithmetic Testing + Sequential & OpenMP versions
+ * Task A03: Static Arithmetic Testing + Sequential & OpenMP versions
  *
  * Features:
  *  - Static test mode: reads 10,000 fixed weights from test_weights.txt
