@@ -295,6 +295,16 @@ MCResult run_cpu_sequential(const std::vector<double>& mu,
 }
 
 // ─────────────────────────── OpenMP MC ────────────────────────────
+//
+// Reproducibility design:
+//   Step 1 (sequential): Generate ALL M weight vectors using the SAME
+//     single mt19937(SEED=42) RNG as the sequential version → bit-identical
+//     weights for every scenario m.
+//   Step 2 (parallel):   Each thread computes metrics for its chunk of
+//     pre-generated weights → no RNG race, results match sequential exactly.
+//
+// Memory: M * K * sizeof(double) = 1e6 * 10 * 8 = ~80 MB (acceptable).
+//
 MCResult run_cpu_openmp(const std::vector<double>& mu,
                         const std::vector<double>& cov,
                         int K,
@@ -306,13 +316,31 @@ MCResult run_cpu_openmp(const std::vector<double>& mu,
 #else
     int nthreads = omp_get_max_threads();
     std::cout << "\n=== OPENMP CPU Monte Carlo ===\n";
-    std::cout << "  M = " << M << " scenarios, threads = " << nthreads << "\n";
+    std::cout << "  M = " << M << " scenarios, threads = " << nthreads
+              << ", seed = " << SEED << " (reproducible)\n";
 
-    // Per-thread local bests
+    // ── Step 1: Pre-generate all weights sequentially (same RNG as sequential) ──
+    // Flat array: all_w[m*K .. m*K+K-1] = weights for scenario m.
+    std::cout << "  [1/2] Generating " << M << " weight vectors (sequential RNG)...\n";
+    std::vector<double> all_w(static_cast<size_t>(M) * K);
+    {
+        std::mt19937 rng(SEED);
+        std::uniform_real_distribution<double> dist(0.0, 1.0);
+        for (int m = 0; m < M; ++m)
+            generate_weights(rng, dist, all_w.data() + static_cast<size_t>(m) * K, K);
+    }
+
+    // ── Step 2: Parallel metric computation over pre-generated weights ──
+    std::cout << "  [2/2] Computing metrics in parallel...\n";
+
     struct LocalBest {
         Portfolio max_sharpe;
         Portfolio min_risk;
-        std::vector<Portfolio> cloud;
+        // cloud: each thread stores its own slice of m < N_CLOUD
+        // With schedule(static), thread 0 handles m=0..chunk-1, so all
+        // cloud points (m < N_CLOUD << M/nthreads typically) land on
+        // thread 0 in order. We store per-thread and merge in tid order.
+        std::vector<std::pair<int,Portfolio>> cloud; // (m, portfolio)
     };
 
     std::vector<LocalBest> locals(nthreads);
@@ -322,49 +350,31 @@ MCResult run_cpu_openmp(const std::vector<double>& mu,
         lb.min_risk.ret      = -1.0;
     }
 
-    // We want the first N_CLOUD globally-ordered samples saved to cloud.
-    // We use a shared vector protected by a critical section only for first N_CLOUD.
-    std::vector<Portfolio> global_cloud;
-    global_cloud.reserve(N_CLOUD);
-
     auto t0 = std::chrono::high_resolution_clock::now();
 
     #pragma omp parallel
     {
-        int tid  = omp_get_thread_num();
-        // Each thread gets its own RNG seeded with SEED + tid
-        std::mt19937 rng(SEED + tid);
-        std::uniform_real_distribution<double> dist(0.0, 1.0);
-        std::vector<double> w(K);
-
+        int tid = omp_get_thread_num();
         LocalBest& lb = locals[tid];
 
         #pragma omp for schedule(static)
         for (int m = 0; m < M; ++m) {
-            generate_weights(rng, dist, w.data(), K);
+            const double* w = all_w.data() + static_cast<size_t>(m) * K;
 
             double ret, risk, sharpe;
-            compute_metrics(w.data(), mu.data(), cov.data(), K, ret, risk, sharpe);
+            compute_metrics(w, mu.data(), cov.data(), K, ret, risk, sharpe);
 
             if (sharpe > lb.max_sharpe.sharpe) {
                 lb.max_sharpe = {ret, risk, sharpe,
-                                 std::vector<double>(w.begin(), w.end())};
+                                 std::vector<double>(w, w + K)};
             }
             if (ret >= R_MIN && risk < lb.min_risk.risk) {
                 lb.min_risk = {ret, risk, sharpe,
-                               std::vector<double>(w.begin(), w.end())};
+                               std::vector<double>(w, w + K)};
             }
-
-            // Collect global cloud (first N_CLOUD across all threads, iteration order)
             if (m < N_CLOUD) {
-                #pragma omp critical
-                {
-                    if (static_cast<int>(global_cloud.size()) < N_CLOUD) {
-                        Portfolio p{ret, risk, sharpe,
-                                    std::vector<double>(w.begin(), w.end())};
-                        global_cloud.push_back(std::move(p));
-                    }
-                }
+                lb.cloud.push_back({m,
+                    Portfolio{ret, risk, sharpe, std::vector<double>(w, w + K)}});
             }
         }
     } // end parallel
@@ -372,20 +382,34 @@ MCResult run_cpu_openmp(const std::vector<double>& mu,
     auto t1 = std::chrono::high_resolution_clock::now();
     double time_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
 
-    // Merge local bests
+    // ── Merge local bests ──
     MCResult result;
     result.time_ms = time_ms;
     result.max_sharpe.sharpe = -std::numeric_limits<double>::max();
     result.min_risk.risk     =  std::numeric_limits<double>::max();
     result.min_risk.ret      = -1.0;
 
+    // Collect all cloud entries, then sort by m to restore sequential order
+    std::vector<std::pair<int,Portfolio>> raw_cloud;
+    raw_cloud.reserve(N_CLOUD);
+
     for (auto& lb : locals) {
         if (lb.max_sharpe.sharpe > result.max_sharpe.sharpe)
             result.max_sharpe = lb.max_sharpe;
         if (lb.min_risk.ret >= 0.0 && lb.min_risk.risk < result.min_risk.risk)
             result.min_risk = lb.min_risk;
+        for (auto& cp : lb.cloud)
+            raw_cloud.push_back(std::move(cp));
     }
-    result.cloud = std::move(global_cloud);
+
+    // Sort by scenario index → cloud identical to sequential's first N_CLOUD
+    std::sort(raw_cloud.begin(), raw_cloud.end(),
+              [](const auto& a, const auto& b){ return a.first < b.first; });
+    if (static_cast<int>(raw_cloud.size()) > N_CLOUD)
+        raw_cloud.resize(N_CLOUD);
+    result.cloud.reserve(raw_cloud.size());
+    for (auto& cp : raw_cloud)
+        result.cloud.push_back(std::move(cp.second));
 
     std::cout << "  Time  : " << std::fixed << std::setprecision(2)
               << result.time_ms << " ms\n";
