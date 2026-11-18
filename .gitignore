@@ -1,0 +1,68 @@
+# ───────── C / C++ build artefacts ─────────
+*.exe
+*.obj
+*.o
+*.so
+*.dylib
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.idb
+
+# ───────── CUDA / GPU build artefacts ───────
+*.cubin
+*.fatbin
+*.ptx
+*.nvvp
+
+# ───────── Build directories ────────────────
+build/
+bin/
+out/
+x64/
+x86/
+Debug/
+Release/
+
+# ───────── Visual Studio / VS Code ──────────
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ───────── CMake build outputs ──────────────
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+
+# ───────── Python ───────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.env
+.venv/
+env/
+venv/
+project/results/python/
+
+# ───────── System / OS ──────────────────────
+.DS_Store
+Thumbs.db
+
+# ───────── Keep these in Git ────────────────
+# Source files, config, and test data are tracked.
+# The negation rules below override the patterns above where needed.
+!project/src/**
+!project/config/**
+!project/tests/test_data/test_weights.txt
+!project/data/**
+!project/*.bat
+!project/CMakeLists.txt
+!project/README.md

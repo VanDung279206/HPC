@@ -1,0 +1,3 @@
+method,M,seed,Rf,R_min,threads,time_ms,speedup_vs_seq,notes
+CPU_Sequential,100000,42,0.0400,0.1200,1,32.0557,1.0,weight_gen+metric_compute+reduction
+CPU_OpenMP,100000,42,0.0400,0.1200,16,2.0672,15.5068,parallel_metric_only(seq_weight_gen_excluded_from_timing)
