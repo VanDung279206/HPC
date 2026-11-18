@@ -1,0 +1,45 @@
+# Visual Studio local state (shared CMakeSettings.json stays in Git).
+.vs/
+*.suo
+*.user
+CMakeUserPresets.json
+
+# CMake/Ninja build directories and generated build files.
+/out/
+/build/
+/project/out/
+/project/build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+build.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+install_manifest.txt
+
+# Compiled C++/CUDA binaries and intermediate files.
+*.exe
+*.obj
+*.o
+*.pdb
+*.ilk
+*.idb
+*.exp
+*.cubin
+*.fatbin
+
+# Generated GPU runs. Keep final report evidence in a separate tracked folder.
+/project/results/gpu/
+/project/src/results/
+
+# Python caches and local virtual environments.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Do not ignore source code, input CSV/TXT data or tests/test_data/test_weights.txt.

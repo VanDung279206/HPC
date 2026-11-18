@@ -5,5 +5,7 @@
   "R_min": 0.12,
   "seed": 42,
   "block_size": 256,
-  "cloud_sample_size": 2000
+  "cloud_sample_size": 2000,
+  "warmup_runs": 1,
+  "repeats": 5
 }
